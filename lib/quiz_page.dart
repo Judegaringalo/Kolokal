@@ -529,9 +529,8 @@ class _QuizPageState extends State<QuizPage>
         buttonColor = const Color.fromARGB(255, 0, 189, 9);
         textColor = const Color.fromARGB(255, 0, 189, 9);
         icon = Icons.check_circle;
-        borderSide = BorderSide(
-            color: const Color.fromARGB(255, 0, 189, 9),
-            width: 4); // Green border
+        borderSide = const BorderSide(
+            color: Color.fromARGB(255, 0, 189, 9), width: 4); // Green border
       } else if (isSelected) {
         // User's Wrong Answer
         buttonColor = errorRed;
@@ -706,7 +705,7 @@ class _QuizPageState extends State<QuizPage>
                     const SizedBox(height: 25),
 
                     // Options
-                    ...currentQuestion.options.map(_buildOptionButton).toList(),
+                    ...currentQuestion.options.map(_buildOptionButton),
                     const Spacer(),
 
                     // Check Answer Button

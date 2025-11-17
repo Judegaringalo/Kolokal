@@ -1,10 +1,10 @@
-import 'dart:convert'; // Added for JSON decoding
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_styles.dart';
 import 'student_info.dart';
 import 'tula.dart';
-import 'quiz_page.dart'; // Ensure this is imported for Question models
+import 'quiz_page.dart';
 
 class LevelsPage extends StatefulWidget {
   final String pangalan;
@@ -23,32 +23,25 @@ class LevelsPage extends StatefulWidget {
 class _LevelsPageState extends State<LevelsPage> {
   late String _currentPangalan;
   late String _currentSeksyon;
-  int _currentHearts = 7; // Default initial value
+  int _currentHearts = 7;
   bool _katamtamanLocked = true;
   bool _mahirapLocked = true;
-  // --- NEW STATE for Completion Status ---
   String? _madaliCompleteStatus;
   String? _katamtamanCompleteStatus;
   String? _mahirapCompleteStatus;
-  // **END NEW STATE**
   bool _isLoading = true;
 
-  // Keys for SharedPreferences
   static const String _hasCompletedOnboardingKey = 'hasCompletedOnboarding';
   static const String _heartsKey = 'userHearts';
   static const String _katamtamanLockedKey = 'katamtamanLocked';
   static const String _mahirapLockedKey = 'mahirapLocked';
-  // --- NEW KEYS for Completion Status ---
   static const String _madaliCompleteKey = 'madaliCompleteStatus';
   static const String _katamtamanCompleteKey = 'katamtamanCompleteStatus';
   static const String _mahirapCompleteKey = 'mahirapCompleteStatus';
-  // **END NEW KEYS**
-
   static const String _indexKeyPrefix = 'quizIndex_';
   static const String _answerKeyPrefix = 'quizAnswer_';
   static const String _submittedKeyPrefix = 'quizSubmitted_';
-  static const String _resultsKeyPrefix =
-      'quizResults_'; // Key for saved results
+  static const String _resultsKeyPrefix = 'quizResults_';
 
   @override
   void initState() {
@@ -58,19 +51,15 @@ class _LevelsPageState extends State<LevelsPage> {
     _loadState();
   }
 
-  // --- Persistence Logic ---
-
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _currentHearts = prefs.getInt(_heartsKey) ?? 7;
       _katamtamanLocked = prefs.getBool(_katamtamanLockedKey) ?? true;
       _mahirapLocked = prefs.getBool(_mahirapLockedKey) ?? true;
-      // --- NEW: Load Completion Status ---
       _madaliCompleteStatus = prefs.getString(_madaliCompleteKey);
       _katamtamanCompleteStatus = prefs.getString(_katamtamanCompleteKey);
       _mahirapCompleteStatus = prefs.getString(_mahirapCompleteKey);
-      // **END NEW**
       _isLoading = false;
     });
   }
@@ -86,24 +75,16 @@ class _LevelsPageState extends State<LevelsPage> {
     });
   }
 
-  // MODIFIED: Added finalScoreStatus parameter
   Future<void> _saveLevelProgress(String completedLevel, int finalHearts,
       bool success, bool fullResetLock, String? finalScoreStatus) async {
-    // <-- MODIFIED SIGNATURE
     final prefs = await SharedPreferences.getInstance();
 
     // 1. Update hearts
     await prefs.setInt(_heartsKey, finalHearts);
 
-    String message;
-    Color snackBarColor;
-
     if (fullResetLock) {
-      // CHECK FOR GAME OVER RESET REQUEST
-      // Force lock the other levels
       await prefs.setBool(_katamtamanLockedKey, true);
       await prefs.setBool(_mahirapLockedKey, true);
-      // Clear all completion statuses
       await prefs.remove(_madaliCompleteKey);
       await prefs.remove(_katamtamanCompleteKey);
       await prefs.remove(_mahirapCompleteKey);
@@ -115,14 +96,7 @@ class _LevelsPageState extends State<LevelsPage> {
         _katamtamanCompleteStatus = null;
         _mahirapCompleteStatus = null;
       });
-      message = 'Nabigo! Na-reset ang antas. Subukan muli mula sa Madali.';
-      snackBarColor = errorRed;
     } else if (success) {
-      // STANDARD SUCCESS LOGIC
-      message = 'Mahusay! Na-save ang iyong progreso.';
-      snackBarColor = Colors.green.shade600;
-
-      // --- NEW: Save Completion Status and handle locks ---
       if (completedLevel == 'Madali' && finalScoreStatus != null) {
         await prefs.setString(_madaliCompleteKey, finalScoreStatus);
         setState(() {
@@ -130,7 +104,6 @@ class _LevelsPageState extends State<LevelsPage> {
           _katamtamanLocked = false;
         });
         await prefs.setBool(_katamtamanLockedKey, false);
-        message = 'Mahusay! Na-unlock ang Katamtaman na lebel!';
       } else if (completedLevel == 'Katamtaman' && finalScoreStatus != null) {
         await prefs.setString(_katamtamanCompleteKey, finalScoreStatus);
         setState(() {
@@ -138,33 +111,21 @@ class _LevelsPageState extends State<LevelsPage> {
           _mahirapLocked = false;
         });
         await prefs.setBool(_mahirapLockedKey, false);
-        message = 'Mahusay! Na-unlock ang Mahirap na lebel!';
       } else if (completedLevel == 'Mahirap' && finalScoreStatus != null) {
         await prefs.setString(_mahirapCompleteKey, finalScoreStatus);
         setState(() {
           _mahirapCompleteStatus = finalScoreStatus;
         });
-        message = 'Mahusay! Nakumpleto mo ang lahat ng antas!';
       }
       // **END NEW**
-    } else {
-      // Should only happen on failure to submit/generic failure, not game over
-      message = 'Nabigo! Hindi na-save ang progreso ng antas. Subukan muli.';
-      snackBarColor = errorRed;
     }
 
     // 3. Update hearts state on current page
-    setState(() => _currentHearts = finalHearts);
+    if (mounted) {
+      setState(() => _currentHearts = finalHearts);
+    }
 
-    // Show a message
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: snackBarColor,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    // REMOVED: ScaffoldMessenger.of(context).showSnackBar
   }
 
   // --- NEW Helper Function to Navigate to Results Page for Review ---
@@ -176,16 +137,7 @@ class _LevelsPageState extends State<LevelsPage> {
     // 1. Load the simple results (QuestionResult)
     final savedResultsJson = prefs.getString(resultsKey);
     if (savedResultsJson == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Error: Hindi mahanap ang nakaraang resulta ng pagsusulit.'),
-            backgroundColor: errorRed,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
+      // REMOVED: ScaffoldMessenger.of(context).showSnackBar for error
       return;
     }
 
@@ -230,25 +182,84 @@ class _LevelsPageState extends State<LevelsPage> {
             results: finalFullResults,
             onReturnToLevels: () {
               // Simply pop back, no need to update state on LevelsPage
-              // This is safe because _saveLevelProgress already ran when the quiz completed.
               Navigator.of(context).pop();
             },
           ),
         ),
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error sa pag-load ng resulta: $e'),
-            backgroundColor: errorRed,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+      // REMOVED: ScaffoldMessenger.of(context).showSnackBar for error
     }
   }
   // --- END NEW Helper Function ---
+
+  // --- NEW: Modal for Locked Levels ---
+  void _showLockedLevelModal(BuildContext context, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+        title: null,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: const BoxDecoration(
+                color: accentYellow,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.lock_rounded,
+                color: primaryBlue,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Ang Antas ay Naka-lock',
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryBlue,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Kailangan mo munang kumpletuhin ang naunang antas para ma-unlock ang $title.',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue,
+                  foregroundColor: white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'OK',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showResetConfirmation(BuildContext context) {
     showDialog(
@@ -317,22 +328,19 @@ class _LevelsPageState extends State<LevelsPage> {
                     ),
                     onPressed: () async {
                       final prefs = await SharedPreferences.getInstance();
-                      // Clear all user data
                       await prefs.remove('pangalan');
                       await prefs.remove('seksyon');
                       await prefs.remove(_hasCompletedOnboardingKey);
-                      await prefs.remove('tulaDraft'); // Clear tula draft
+                      await prefs.remove('tulaDraft');
 
-                      // Clear global quiz keys (Hearts and Locks)
                       await prefs.remove(_heartsKey);
                       await prefs.remove(_katamtamanLockedKey);
                       await prefs.remove(_mahirapLockedKey);
-                      // Clear completion status keys
+
                       await prefs.remove(_madaliCompleteKey);
                       await prefs.remove(_katamtamanCompleteKey);
                       await prefs.remove(_mahirapCompleteKey);
 
-                      // Clear all specific quiz progress keys
                       const List<String> quizLevels = [
                         'Madali',
                         'Katamtaman',
@@ -342,8 +350,7 @@ class _LevelsPageState extends State<LevelsPage> {
                         await prefs.remove(_indexKeyPrefix + level);
                         await prefs.remove(_answerKeyPrefix + level);
                         await prefs.remove(_submittedKeyPrefix + level);
-                        await prefs.remove(
-                            _resultsKeyPrefix + level); // Clear quiz results
+                        await prefs.remove(_resultsKeyPrefix + level);
                       }
 
                       if (!mounted) return;
@@ -395,7 +402,6 @@ class _LevelsPageState extends State<LevelsPage> {
             left: 24,
             right: 24,
             top: 24,
-            // Add padding to ensure content is above the keyboard
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -499,8 +505,7 @@ class _LevelsPageState extends State<LevelsPage> {
                   ),
                 ),
               ),
-              const SizedBox(
-                  height: 30), // Extra space for better visual bottom
+              const SizedBox(height: 30),
             ],
           ),
         ),
@@ -552,16 +557,14 @@ class _LevelsPageState extends State<LevelsPage> {
                                 const EdgeInsets.symmetric(horizontal: 20.0),
                             child: Column(
                               children: [
-                                // Madali Level
                                 _buildPlayerItem(
                                   'Madali',
                                   '5 tanong para sa mga nagsisimula',
                                   Icons.menu_book_rounded,
                                   primaryBlue,
-                                  locked: false, // Always unlocked
+                                  locked: false,
                                   completionStatus: _madaliCompleteStatus,
                                   onTap: () {
-                                    // MODIFIED LOGIC: If completed, navigate to review, otherwise start quiz
                                     if (_madaliCompleteStatus != null) {
                                       _navigateToResultsForReview(
                                           'Madali', _madaliCompleteStatus!);
@@ -583,10 +586,9 @@ class _LevelsPageState extends State<LevelsPage> {
                                                   finalScoreStatus),
                                         ),
                                       ),
-                                    ); // <-- Inalis ang .then((_) => _loadState());
+                                    );
                                   },
                                 ),
-                                // Katamtaman Level
                                 _buildPlayerItem(
                                   'Katamtaman',
                                   '5 tanong na mas hamon',
@@ -600,7 +602,6 @@ class _LevelsPageState extends State<LevelsPage> {
                                   completionStatus: _katamtamanCompleteStatus,
                                   onTap: () {
                                     if (_katamtamanLocked) return;
-                                    // MODIFIED LOGIC: If completed, navigate to review, otherwise start quiz
                                     if (_katamtamanCompleteStatus != null) {
                                       _navigateToResultsForReview('Katamtaman',
                                           _katamtamanCompleteStatus!);
@@ -622,10 +623,9 @@ class _LevelsPageState extends State<LevelsPage> {
                                                   finalScoreStatus),
                                         ),
                                       ),
-                                    ); // <-- Inalis ang .then((_) => _loadState());
+                                    );
                                   },
                                 ),
-                                // Mahirap Level
                                 _buildPlayerItem(
                                   'Mahirap',
                                   '5 tanong para sa mga dalubhasa',
@@ -639,7 +639,6 @@ class _LevelsPageState extends State<LevelsPage> {
                                   completionStatus: _mahirapCompleteStatus,
                                   onTap: () {
                                     if (_mahirapLocked) return;
-                                    // MODIFIED LOGIC: If completed, navigate to review, otherwise start quiz
                                     if (_mahirapCompleteStatus != null) {
                                       _navigateToResultsForReview(
                                           'Mahirap', _mahirapCompleteStatus!);
@@ -661,10 +660,10 @@ class _LevelsPageState extends State<LevelsPage> {
                                                   finalScoreStatus),
                                         ),
                                       ),
-                                    ); // <-- Inalis ang .then((_) => _loadState());
+                                    );
                                   },
                                 ),
-                                // Tula Page
+                                // --- MODIFIED: Tula Page tap ---
                                 _buildPlayerItem(
                                   'Tula',
                                   'Sumulat gamit ang iyong natutunayan na pormal na salita',
@@ -674,11 +673,17 @@ class _LevelsPageState extends State<LevelsPage> {
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (ctx) => const SanaysayPage(),
+                                        // OLD: builder: (ctx) => const SanaysayPage(),
+                                        // NEW: Pass the user info
+                                        builder: (ctx) => SanaysayPage(
+                                          pangalan: _currentPangalan,
+                                          seksyon: _currentSeksyon,
+                                        ),
                                       ),
                                     );
                                   },
                                 ),
+                                // --- END MODIFIED ---
                               ],
                             ),
                           ),
@@ -835,7 +840,6 @@ class _LevelsPageState extends State<LevelsPage> {
     );
   }
 
-  // MODIFIED: Added completionStatus parameter
   Widget _buildPlayerItem(
     String title,
     String subtitle,
@@ -843,10 +847,8 @@ class _LevelsPageState extends State<LevelsPage> {
     Color iconColor, {
     required bool locked,
     VoidCallback? onTap,
-    String? completionStatus, // <-- NEW PARAMETER
+    String? completionStatus,
   }) {
-    // If the level is completed (completionStatus is not null) and it's not the Tula page,
-    // apply a completed style to make it visually distinct and non-interactive for quizzes.
     final bool isCompletedQuiz = completionStatus != null && title != 'Tula';
     final Color itemColor = isCompletedQuiz ? Colors.green.shade50 : white;
     final Color titleColor = isCompletedQuiz ? Colors.green.shade700 : black87;
@@ -854,23 +856,12 @@ class _LevelsPageState extends State<LevelsPage> {
         isCompletedQuiz ? Colors.green.shade500 : black54;
 
     return GestureDetector(
-      onTap: locked
-          ? () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      'Kailangan mo munang kumpletuhin ang naunang antas para ma-unlock ang $title.'),
-                  backgroundColor: accentYellow,
-                  duration: const Duration(seconds: 1),
-                ),
-              );
-            }
-          : onTap,
+      onTap: locked ? () => _showLockedLevelModal(context, title) : onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8),
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: itemColor, // Use itemColor
+          color: itemColor,
           borderRadius: BorderRadius.circular(25),
           boxShadow: [
             BoxShadow(
@@ -902,23 +893,19 @@ class _LevelsPageState extends State<LevelsPage> {
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w600,
                       fontSize: 16,
-                      color:
-                          locked ? Colors.grey : titleColor, // Use titleColor
+                      color: locked ? Colors.grey : titleColor,
                     ),
                   ),
                   Text(
                     locked
                         ? 'Nakalock'
-                        // MODIFIED: Check for completionStatus
                         : (completionStatus != null
-                            ? 'Kumpleto: $completionStatus' // Display score
-                            : subtitle), // Original subtitle
+                            ? 'Kumpleto: $completionStatus'
+                            : subtitle),
                     style: TextStyle(
                       fontFamily: 'Poppins',
                       fontSize: 13,
-                      color: locked
-                          ? Colors.grey
-                          : subtitleColor, // Use subtitleColor
+                      color: locked ? Colors.grey : subtitleColor,
                     ),
                   ),
                 ],
@@ -929,8 +916,7 @@ class _LevelsPageState extends State<LevelsPage> {
                   ? Icons.lock_outline
                   : (isCompletedQuiz
                       ? Icons.check_circle_outline
-                      : Icons
-                          .arrow_forward_ios_rounded), // Use checkmark for completed
+                      : Icons.arrow_forward_ios_rounded),
               color: locked
                   ? Colors.grey.shade400
                   : (isCompletedQuiz ? Colors.green.shade700 : primaryBlue),

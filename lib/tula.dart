@@ -1,11 +1,23 @@
+import 'dart:io'; // <-- MAKE SURE THIS IMPORT IS ADDED
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:screenshot/screenshot.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_styles.dart';
 
 const String _draftKey = 'tulaDraft';
 
 class SanaysayPage extends StatefulWidget {
-  const SanaysayPage({super.key});
+  final String pangalan;
+  final String seksyon;
+
+  const SanaysayPage({
+    super.key,
+    required this.pangalan,
+    required this.seksyon,
+  });
 
   @override
   State<SanaysayPage> createState() => _SanaysayPageState();
@@ -13,6 +25,7 @@ class SanaysayPage extends StatefulWidget {
 
 class _SanaysayPageState extends State<SanaysayPage> {
   final TextEditingController _essayController = TextEditingController();
+  final ScreenshotController _screenshotController = ScreenshotController();
   int _wordCount = 0;
   bool _isLoading = true;
 
@@ -53,6 +66,141 @@ class _SanaysayPageState extends State<SanaysayPage> {
   }
 
   void _updateWordCount() => _updateAndSaveDraft();
+
+  // --- MODIFIED: Function to capture and save image ---
+  Future<void> _saveTulaAsImage() async {
+    // 1. Check permissions ONLY for iOS
+    if (Platform.isIOS) {
+      // Use Permission.photos for iOS 14+
+      var status = await Permission.photos.status;
+      if (!status.isGranted) {
+        status = await Permission.photos.request();
+      }
+
+      if (!status.isGranted) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content:
+                Text('Kailangan ng access sa Photos para mag-save ng imahe.'),
+            backgroundColor: errorRed,
+          ),
+        );
+        return;
+      }
+    }
+
+    // For Android, image_gallery_saver handles permissions:
+    // - API 29+ (Android 10+): No permission needed to save to gallery.
+    // - API 28 (Android 9) and lower: Uses WRITE_EXTERNAL_STORAGE from AndroidManifest.xml.
+    //
+    // The previous check for Permission.storage was incorrect and fails on
+    // modern Android (13+), which is why you saw the error.
+
+    // 2. Capture the widget
+    try {
+      final Uint8List? image = await _screenshotController.capture(
+        delay: const Duration(milliseconds: 10),
+      );
+
+      if (image == null) throw Exception('Hindi ma-capture ang imahe.');
+
+      // 3. Save to gallery
+      final result = await ImageGallerySaverPlus.saveImage(
+        image,
+        quality: 95,
+        name:
+            'Tula_${widget.pangalan}_${DateTime.now().millisecondsSinceEpoch}',
+      );
+
+      if (result['isSuccess'] == true) {
+        // Show success modal
+        _showSaveSuccessModal(context, isImage: true);
+      } else {
+        throw Exception(result['errorMessage'] ?? 'Unknown error saving image');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Nagka-error sa pag-save: $e'),
+          backgroundColor: errorRed,
+        ),
+      );
+    }
+  }
+  // --- END MODIFIED ---
+
+  void _showSaveSuccessModal(BuildContext context, {bool isImage = false}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
+        title: null,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade400,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: white,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              isImage ? 'Na-save ang Imahe!' : 'Na-save ang Tula!',
+              style: const TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: primaryBlue,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              isImage
+                  ? 'Ang iyong tula ay na-save sa gallery ng iyong device.'
+                  : 'Ang iyong draft ay ligtas na na-save at patuloy na a-auto-save.',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryBlue,
+                  foregroundColor: white,
+                  // --- THIS IS THE FIX ---
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  // --- END FIX ---
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text(
+                  'Tapos na',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -100,15 +248,18 @@ class _SanaysayPageState extends State<SanaysayPage> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
-                    // ✅ Flexible layout to prevent overflow
                     LayoutBuilder(
                       builder: (context, constraints) {
                         if (constraints.maxWidth > 700) {
                           return Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(child: _buildEssayInputCard()),
+                              Expanded(
+                                child: Screenshot(
+                                  controller: _screenshotController,
+                                  child: _buildEssayInputCard(),
+                                ),
+                              ),
                               const SizedBox(width: 16),
                               SizedBox(width: 280, child: _buildTipsCard()),
                             ],
@@ -117,7 +268,10 @@ class _SanaysayPageState extends State<SanaysayPage> {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _buildEssayInputCard(),
+                              Screenshot(
+                                controller: _screenshotController,
+                                child: _buildEssayInputCard(),
+                              ),
                               const SizedBox(height: 20),
                               _buildTipsCard(),
                             ],
@@ -125,9 +279,8 @@ class _SanaysayPageState extends State<SanaysayPage> {
                         }
                       },
                     ),
-
                     const SizedBox(height: 24),
-                    _buildRubricTable(), // ✅ Fixed responsive rubric
+                    _buildRubricTable(),
                   ],
                 ),
               ),
@@ -153,17 +306,49 @@ class _SanaysayPageState extends State<SanaysayPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.edit_note, color: accentYellow, size: 24),
-              SizedBox(width: 8),
-              Text(
-                'Iyong tula',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  color: white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 20,
+              const Row(
+                children: [
+                  Icon(Icons.edit_note, color: accentYellow, size: 24),
+                  SizedBox(width: 8),
+                  Text(
+                    'Iyong tula',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      color: white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      widget.pangalan,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        color: white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                    Text(
+                      widget.seksyon,
+                      style: const TextStyle(
+                        fontFamily: 'Poppins',
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                      textAlign: TextAlign.right,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -224,16 +409,11 @@ class _SanaysayPageState extends State<SanaysayPage> {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Ang Tula ay na-save!'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                _saveTulaAsImage();
               },
-              icon: const Icon(Icons.save, color: primaryBlue),
+              icon: const Icon(Icons.image, color: primaryBlue),
               label: const Text(
-                'I-Save',
+                'I-Save bilang Imahe',
                 style: TextStyle(
                   fontFamily: 'Poppins',
                   fontWeight: FontWeight.bold,
