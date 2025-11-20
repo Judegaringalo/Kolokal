@@ -1,4 +1,4 @@
-import 'dart:io'; // <-- MAKE SURE THIS IMPORT IS ADDED
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_gallery_saver_plus/image_gallery_saver_plus.dart';
@@ -67,11 +67,8 @@ class _SanaysayPageState extends State<SanaysayPage> {
 
   void _updateWordCount() => _updateAndSaveDraft();
 
-  // --- MODIFIED: Function to capture and save image ---
   Future<void> _saveTulaAsImage() async {
-    // 1. Check permissions ONLY for iOS
     if (Platform.isIOS) {
-      // Use Permission.photos for iOS 14+
       var status = await Permission.photos.status;
       if (!status.isGranted) {
         status = await Permission.photos.request();
@@ -90,22 +87,12 @@ class _SanaysayPageState extends State<SanaysayPage> {
       }
     }
 
-    // For Android, image_gallery_saver handles permissions:
-    // - API 29+ (Android 10+): No permission needed to save to gallery.
-    // - API 28 (Android 9) and lower: Uses WRITE_EXTERNAL_STORAGE from AndroidManifest.xml.
-    //
-    // The previous check for Permission.storage was incorrect and fails on
-    // modern Android (13+), which is why you saw the error.
-
-    // 2. Capture the widget
     try {
       final Uint8List? image = await _screenshotController.capture(
         delay: const Duration(milliseconds: 10),
       );
 
       if (image == null) throw Exception('Hindi ma-capture ang imahe.');
-
-      // 3. Save to gallery
       final result = await ImageGallerySaverPlus.saveImage(
         image,
         quality: 95,
@@ -114,7 +101,6 @@ class _SanaysayPageState extends State<SanaysayPage> {
       );
 
       if (result['isSuccess'] == true) {
-        // Show success modal
         _showSaveSuccessModal(context, isImage: true);
       } else {
         throw Exception(result['errorMessage'] ?? 'Unknown error saving image');
@@ -129,7 +115,6 @@ class _SanaysayPageState extends State<SanaysayPage> {
       );
     }
   }
-  // --- END MODIFIED ---
 
   void _showSaveSuccessModal(BuildContext context, {bool isImage = false}) {
     showDialog(
@@ -179,11 +164,9 @@ class _SanaysayPageState extends State<SanaysayPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryBlue,
                   foregroundColor: white,
-                  // --- THIS IS THE FIX ---
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(50),
                   ),
-                  // --- END FIX ---
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onPressed: () => Navigator.of(ctx).pop(),

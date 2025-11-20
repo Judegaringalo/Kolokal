@@ -16,9 +16,8 @@ dependencies:
   path_provider: ^2.1.3
   permission_handler: ^11.3.1
   
-  # --- REPLACED: Use this instead of image_gallery_saver ---
   screenshot: ^3.0.0
-  image_gallery_saver_plus: ^4.0.1  # Latest stable version
+  image_gallery_saver_plus: ^4.0.1 
 
 dev_dependencies:
   flutter_test:

@@ -79,7 +79,6 @@ class _LevelsPageState extends State<LevelsPage> {
       bool success, bool fullResetLock, String? finalScoreStatus) async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 1. Update hearts
     await prefs.setInt(_heartsKey, finalHearts);
 
     if (fullResetLock) {
@@ -117,27 +116,20 @@ class _LevelsPageState extends State<LevelsPage> {
           _mahirapCompleteStatus = finalScoreStatus;
         });
       }
-      // **END NEW**
     }
 
-    // 3. Update hearts state on current page
     if (mounted) {
       setState(() => _currentHearts = finalHearts);
     }
-
-    // REMOVED: ScaffoldMessenger.of(context).showSnackBar
   }
 
-  // --- NEW Helper Function to Navigate to Results Page for Review ---
   Future<void> _navigateToResultsForReview(
       String level, String scoreStatus) async {
     final prefs = await SharedPreferences.getInstance();
     final resultsKey = _resultsKeyPrefix + level;
 
-    // 1. Load the simple results (QuestionResult)
     final savedResultsJson = prefs.getString(resultsKey);
     if (savedResultsJson == null) {
-      // REMOVED: ScaffoldMessenger.of(context).showSnackBar for error
       return;
     }
 
@@ -146,10 +138,8 @@ class _LevelsPageState extends State<LevelsPage> {
       final List<QuestionResult> simpleResults =
           list.map((e) => QuestionResult.fromJson(e)).toList();
 
-      // 2. Map simple results back to full results with explanations
       final List<FullQuestionResult> finalFullResults =
           simpleResults.map((simpleResult) {
-        // Find the corresponding Question object and create FullQuestionResult
         final question = Question.fromText(simpleResult.questionText, level) ??
             Question(
               questionText: simpleResult.questionText,
@@ -166,12 +156,10 @@ class _LevelsPageState extends State<LevelsPage> {
         );
       }).toList();
 
-      // 3. Extract score from scoreStatus
       final parts = scoreStatus.split('/');
       final int finalScore = int.tryParse(parts[0]) ?? 0;
       final int maxScore = int.tryParse(parts[1]) ?? 0;
 
-      // 4. Navigate to the QuizResultPage
       if (!mounted) return;
       Navigator.of(context).push(
         MaterialPageRoute(
@@ -181,19 +169,14 @@ class _LevelsPageState extends State<LevelsPage> {
             maxScore: maxScore,
             results: finalFullResults,
             onReturnToLevels: () {
-              // Simply pop back, no need to update state on LevelsPage
               Navigator.of(context).pop();
             },
           ),
         ),
       );
-    } catch (e) {
-      // REMOVED: ScaffoldMessenger.of(context).showSnackBar for error
-    }
+    } catch (e) {}
   }
-  // --- END NEW Helper Function ---
 
-  // --- NEW: Modal for Locked Levels ---
   void _showLockedLevelModal(BuildContext context, String title) {
     showDialog(
       context: context,
@@ -663,7 +646,6 @@ class _LevelsPageState extends State<LevelsPage> {
                                     );
                                   },
                                 ),
-                                // --- MODIFIED: Tula Page tap ---
                                 _buildPlayerItem(
                                   'Tula',
                                   'Sumulat gamit ang iyong natutunayan na pormal na salita',
@@ -673,8 +655,6 @@ class _LevelsPageState extends State<LevelsPage> {
                                   onTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        // OLD: builder: (ctx) => const SanaysayPage(),
-                                        // NEW: Pass the user info
                                         builder: (ctx) => SanaysayPage(
                                           pangalan: _currentPangalan,
                                           seksyon: _currentSeksyon,
@@ -683,7 +663,6 @@ class _LevelsPageState extends State<LevelsPage> {
                                     );
                                   },
                                 ),
-                                // --- END MODIFIED ---
                               ],
                             ),
                           ),

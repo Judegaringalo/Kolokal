@@ -3,21 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'app_styles.dart';
 
-// --- Data Model for a Quiz Question ---
 class Question {
   final String questionText;
   final List<String> options;
   final String correctAnswer;
-  final String explanation; // ADDED
+  final String explanation;
 
   const Question({
     required this.questionText,
     required this.options,
     required this.correctAnswer,
-    required this.explanation, // ADDED
+    required this.explanation,
   });
 
-  // Method to find the matching Question from quizData based on questionText
   static Question? fromText(String questionText, String level) {
     return quizData[level]?.firstWhere((q) => q.questionText == questionText,
         orElse: () => Question(
@@ -29,9 +27,8 @@ class Question {
   }
 }
 
-// --- Question Result Model ---
 class QuestionResult {
-  final String questionText; // Store text instead of object for serialization
+  final String questionText;
   final String? userAnswer;
   final bool isCorrect;
 
@@ -41,14 +38,12 @@ class QuestionResult {
     required this.isCorrect,
   });
 
-  // Serialization to JSON map
   Map<String, dynamic> toJson() => {
         'questionText': questionText,
         'userAnswer': userAnswer,
         'isCorrect': isCorrect,
       };
 
-  // Deserialization from JSON map
   factory QuestionResult.fromJson(Map<String, dynamic> json) {
     return QuestionResult(
       questionText: json['questionText'] as String,
@@ -58,7 +53,6 @@ class QuestionResult {
   }
 }
 
-// --- Quiz Questions Data ---
 const Map<String, List<Question>> quizData = {
   'Madali': [
     Question(
@@ -172,7 +166,6 @@ const Map<String, List<Question>> quizData = {
   ],
 };
 
-// NEW model for the result page to hold full Question data (Moved up for use in LevelsPage)
 class FullQuestionResult {
   final Question question;
   final String? userAnswer;
@@ -185,10 +178,8 @@ class FullQuestionResult {
   });
 }
 
-// --- QUIZ PAGE ---
 class QuizPage extends StatefulWidget {
   final String level;
-  // MODIFIED: Added finalScoreStatus parameter to the function type
   final Function(int finalHearts, bool success, bool fullResetLock,
       String? finalScoreStatus) onQuizComplete;
 
@@ -217,7 +208,6 @@ class _QuizPageState extends State<QuizPage>
   late Animation<double> _scaleAnimation;
   bool _showCorrectFeedback = false;
 
-  // Keys for persistence
   static const String _heartsKey = 'userHearts';
   static const String _indexKeyPrefix = 'quizIndex_';
   static const String _answerKeyPrefix = 'quizAnswer_';
@@ -250,8 +240,6 @@ class _QuizPageState extends State<QuizPage>
     super.dispose();
   }
 
-  // --- Persistence Logic ---
-
   Future<void> _loadState() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -266,14 +254,12 @@ class _QuizPageState extends State<QuizPage>
     _selectedAnswer = prefs.getString(answerKey);
     _isAnswerSubmitted = prefs.getBool(submittedKey) ?? false;
 
-    // Load existing results
     final savedResultsJson = prefs.getString(resultsKey);
     if (savedResultsJson != null) {
       try {
         final List<dynamic> list = json.decode(savedResultsJson);
         _results = list.map((e) => QuestionResult.fromJson(e)).toList();
       } catch (e) {
-        // print('Error loading results: $e');
         _results = [];
       }
     } else {
@@ -281,13 +267,9 @@ class _QuizPageState extends State<QuizPage>
     }
 
     if (_currentQuestionIndex >= _questions.length) {
-      // If index is out of bounds, it means the quiz was completed but the completion
-      // status wasn't reset (which should only happen if the user didn't return to levels page)
-      // Reset locally but keep the completion status in prefs to allow review.
       _currentQuestionIndex = 0;
       _isAnswerSubmitted = false;
       _selectedAnswer = null;
-      // DO NOT call _clearLevelProgress here, as it would delete the review data.
     }
 
     setState(() => _isLoading = false);
@@ -315,18 +297,14 @@ class _QuizPageState extends State<QuizPage>
     }
     await prefs.setBool(submittedKey, _isAnswerSubmitted);
 
-    // Save the results list
     final resultsJson = json.encode(_results.map((r) => r.toJson()).toList());
     await prefs.setString(resultsKey, resultsJson);
   }
 
   Future<bool> _onWillPop() async {
-    // Save current selection and index when leaving the page
     await _saveProgress();
     return true;
   }
-
-  // --- Quiz Logic ---
 
   void _showCorrectFeedbackOverlay() async {
     if (!mounted) return;
@@ -357,27 +335,19 @@ class _QuizPageState extends State<QuizPage>
     setState(() {
       _isAnswerSubmitted = true;
     });
-    // Call _saveProgress *after* recording the result below
 
     bool isCorrect =
         _selectedAnswer == _questions[_currentQuestionIndex].correctAnswer;
-
-    // Record the result for the current question
     final currentQuestion = _questions[_currentQuestionIndex];
-
-    // Remove any existing result for this question (for safety/re-submission)
     _results.removeWhere((r) => r.questionText == currentQuestion.questionText);
-
-    // Add the new result
     _results.add(
       QuestionResult(
-        questionText: currentQuestion.questionText, // Save only the text
+        questionText: currentQuestion.questionText,
         userAnswer: _selectedAnswer,
         isCorrect: isCorrect,
       ),
     );
 
-    // Now save state including the results list
     _saveProgress();
 
     if (isCorrect) {
@@ -403,17 +373,10 @@ class _QuizPageState extends State<QuizPage>
       });
       _saveProgress();
     } else {
-      // Quiz finished successfully - Navigate to QuizResultPage
-
-      // Calculate final score: 4 points per correct question
       int maxScore = _questions.length * 4;
       int finalScore = _results.where((r) => r.isCorrect).length * 4;
       String finalScoreStatus = '$finalScore/$maxScore';
-
-      // Clear non-result progress keys for this level upon completion
       _clearLevelProgress();
-
-      // Map simplified results back to full results with explanations
       final List<FullQuestionResult> finalFullResults =
           _results.map((simpleResult) {
         final question =
@@ -424,8 +387,6 @@ class _QuizPageState extends State<QuizPage>
           isCorrect: simpleResult.isCorrect,
         );
       }).toList();
-
-      // Navigate to the new results page
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => QuizResultPage(
@@ -434,10 +395,8 @@ class _QuizPageState extends State<QuizPage>
             maxScore: maxScore,
             results: finalFullResults,
             onReturnToLevels: () {
-              // 1. Notify parent (LevelsPage) to save hearts, unlock next level, and save score
               widget.onQuizComplete(
                   _currentHearts, true, false, finalScoreStatus);
-              // 2. Since QuizPage was replaced by QuizResultPage, we need to pop to reveal LevelsPage
               Navigator.of(context).pop();
             },
           ),
@@ -456,8 +415,6 @@ class _QuizPageState extends State<QuizPage>
       await prefs.remove(_resultsKeyPrefix + widget.level);
     }
   }
-
-  // --- UI Modals ---
 
   void _showGameOverModal() {
     if (!mounted) return;
@@ -484,16 +441,11 @@ class _QuizPageState extends State<QuizPage>
               ElevatedButton(
                 onPressed: () async {
                   await _saveHearts(_maxHearts);
-                  // Clear all progress and results upon game over
                   await _clearLevelProgress(clearResults: true);
-                  // Pass null for the score status on failure/game over
                   widget.onQuizComplete(_maxHearts, false, true, null);
                   if (!mounted) return;
-
-                  // FIX: Use a double pop to return to LevelsPage (Pop Modal, then Pop QuizPage)
-                  Navigator.of(context).pop(); // Pop the Game Over modal
-                  Navigator.of(context)
-                      .pop(); // Pop the QuizPage, revealing LevelsPage
+                  Navigator.of(context).pop();
+                  Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: accentYellow,
@@ -513,8 +465,6 @@ class _QuizPageState extends State<QuizPage>
     );
   }
 
-  // --- Widget Builders and Build method ---
-
   Widget _buildOptionButton(String option) {
     bool isSelected = _selectedAnswer == option;
     Color buttonColor = cardBlue;
@@ -525,31 +475,25 @@ class _QuizPageState extends State<QuizPage>
 
     if (_isAnswerSubmitted) {
       if (option == _questions[_currentQuestionIndex].correctAnswer) {
-        // Correct Answer
         buttonColor = const Color.fromARGB(255, 0, 189, 9);
         textColor = const Color.fromARGB(255, 0, 189, 9);
         icon = Icons.check_circle;
-        borderSide = const BorderSide(
-            color: Color.fromARGB(255, 0, 189, 9), width: 4); // Green border
+        borderSide =
+            const BorderSide(color: Color.fromARGB(255, 0, 189, 9), width: 4);
       } else if (isSelected) {
-        // User's Wrong Answer
         buttonColor = errorRed;
         textColor = const Color.fromARGB(255, 233, 117, 117);
         icon = Icons.close_rounded;
-        borderSide = const BorderSide(
-            color: errorRed, width: 4); // White border for wrong answer
+        borderSide = const BorderSide(color: errorRed, width: 4);
       } else {
-        // Unselected, incorrect answers
         buttonColor = cardBlue.withOpacity(0.5);
         textColor = white70;
       }
     } else if (isSelected) {
-      // Pre-submission, selected answer
       buttonColor = accentYellow;
       textColor = primaryBlue;
       borderSide = const BorderSide(color: primaryBlue, width: 3);
     }
-    // else: Pre-submission, unselected answer (default values apply)
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -574,7 +518,7 @@ class _QuizPageState extends State<QuizPage>
             borderRadius: BorderRadius.circular(15),
           ),
           elevation: 5,
-          side: borderSide, // Use the dynamically calculated border
+          side: borderSide,
         ),
         child: Row(
           children: [
@@ -644,14 +588,12 @@ class _QuizPageState extends State<QuizPage>
         ),
         body: Stack(
           children: [
-            // Layer 1: The main quiz UI
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // HEARTS
                     Center(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -670,8 +612,6 @@ class _QuizPageState extends State<QuizPage>
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    // Progress Bar
                     ClipRRect(
                       borderRadius: BorderRadius.circular(10),
                       child: LinearProgressIndicator(
@@ -683,14 +623,11 @@ class _QuizPageState extends State<QuizPage>
                       ),
                     ),
                     const SizedBox(height: 10),
-                    // Question Count
                     Text(
                       'Tanong ${_currentQuestionIndex + 1} / ${_questions.length}',
                       style: poppinsWhite70_14,
                     ),
                     const SizedBox(height: 20),
-
-                    // Question Card
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -703,12 +640,8 @@ class _QuizPageState extends State<QuizPage>
                       ),
                     ),
                     const SizedBox(height: 25),
-
-                    // Options
                     ...currentQuestion.options.map(_buildOptionButton),
                     const Spacer(),
-
-                    // Check Answer Button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
@@ -734,8 +667,6 @@ class _QuizPageState extends State<QuizPage>
                 ),
               ),
             ),
-
-            // Layer 2: The "Mahusay!" feedback overlay (conditional)
             if (_showCorrectFeedback)
               Positioned.fill(
                 child: Container(
@@ -774,13 +705,11 @@ class _QuizPageState extends State<QuizPage>
   }
 }
 
-// --- QUIZ RESULT PAGE (NEW WIDGET) ---
-
 class QuizResultPage extends StatelessWidget {
   final String level;
   final int finalScore;
   final int maxScore;
-  final List<FullQuestionResult> results; // Use FullQuestionResult
+  final List<FullQuestionResult> results;
   final VoidCallback onReturnToLevels;
 
   const QuizResultPage({
@@ -799,7 +728,6 @@ class QuizResultPage extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Container(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
               child: Column(
@@ -829,8 +757,6 @@ class QuizResultPage extends StatelessWidget {
                 ],
               ),
             ),
-
-            // Results List
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -845,20 +771,13 @@ class QuizResultPage extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Bottom Button
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Trigger state update and navigation back to LevelsPage
-                    // The onReturnToLevels callback now handles the navigation (pop).
                     onReturnToLevels();
-
-                    // This pop was removed to fix double-pop issue when reviewing a completed quiz.
-                    // Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accentYellow,
@@ -883,10 +802,9 @@ class QuizResultPage extends StatelessWidget {
   }
 }
 
-// Helper Widget for a single question review tile
 class _ResultQuestionTile extends StatelessWidget {
   final int questionNumber;
-  final FullQuestionResult result; // Use FullQuestionResult
+  final FullQuestionResult result;
 
   const _ResultQuestionTile({
     required this.questionNumber,
@@ -895,10 +813,7 @@ class _ResultQuestionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Color for the checkmark/cross icon
     final iconColor = result.isCorrect ? Colors.green.shade400 : errorRed;
-
-    // Determine the user's selected answer text for display
     final String userAnswerText = result.userAnswer ?? 'Walang Sagot';
 
     return Padding(
@@ -934,21 +849,17 @@ class _ResultQuestionTile extends StatelessWidget {
             ],
           ),
           children: [
-            // Body of the question tile
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Question Text
                   Text(
                     result.question.questionText,
                     style: const TextStyle(
                         fontFamily: 'Poppins', fontSize: 15, color: white70),
                   ),
                   const SizedBox(height: 12),
-
-                  // User's Answer vs Correct Answer
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
@@ -975,7 +886,6 @@ class _ResultQuestionTile extends StatelessWidget {
                           ),
                       ],
                     ),
-                    // Explanation Header
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -984,7 +894,6 @@ class _ResultQuestionTile extends StatelessWidget {
                         color: accentYellow, fontSize: 14),
                   ),
                   const SizedBox(height: 4),
-                  // Explanation Body
                   Text(
                     result.question.explanation,
                     style: const TextStyle(

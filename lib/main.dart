@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'student_info.dart';
 import 'app_styles.dart';
 
-// Global navigation key to control app flow
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
@@ -15,7 +14,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // Essential for reset flow
+      navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
       home: const OnboardingScreen(),
     );
